@@ -2,6 +2,8 @@
 
 A polished WezTerm configuration with Tokyo Night theme, status bar, and macOS-friendly keybindings.
 
+![Demo](demo.png)
+
 ## Features
 
 - **Theme**: Tokyo Night color scheme with JetBrains Mono font
