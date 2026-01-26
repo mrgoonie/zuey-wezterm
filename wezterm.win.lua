@@ -2,6 +2,9 @@ local wezterm = require 'wezterm'
 local act = wezterm.action
 local config = wezterm.config_builder()
 
+-- Session persistence plugin
+local resurrect = wezterm.plugin.require 'https://github.com/MLFlexer/resurrect.wezterm'
+
 -- Default shell: PowerShell (Windows)
 config.default_prog = { 'powershell.exe' }
 
@@ -41,8 +44,6 @@ config.cursor_blink_rate = 500
 -- Scrollback
 config.scrollback_lines = 10000
 
--- Session persistence - auto-restore tabs/panes on restart
-config.default_workspace = 'main'
 
 -- Long-running command notifications (alert after 10 seconds)
 config.audible_bell = 'Disabled'
@@ -139,16 +140,47 @@ end)
 
 -- Key bindings (Windows: CTRL instead of CMD)
 config.keys = {
+  -- Smart Ctrl+C: copy if selection exists, otherwise send SIGINT
+  { key = 'c', mods = 'CTRL', action = wezterm.action_callback(function(window, pane)
+    local has_selection = window:get_selection_text_for_pane(pane) ~= ''
+    if has_selection then
+      window:perform_action(act.CopyTo 'ClipboardAndPrimarySelection', pane)
+      window:perform_action(act.ClearSelection, pane)
+    else
+      window:perform_action(act.SendKey { key = 'c', mods = 'CTRL' }, pane)
+    end
+  end) },
+
+  -- Smart Ctrl+V: paste from clipboard
+  { key = 'v', mods = 'CTRL', action = act.PasteFrom 'Clipboard' },
+
   -- Word navigation (Alt + Arrow)
-  { key = 'LeftArrow', mods = 'ALT', action = act.SendKey { key = 'b', mods = 'CTRL' } },
-  { key = 'RightArrow', mods = 'ALT', action = act.SendKey { key = 'f', mods = 'CTRL' } },
+  { key = 'LeftArrow', mods = 'ALT', action = wezterm.action_callback(function(window, pane)
+    pane:send_text('\x1bb')
+  end) },
+  { key = 'RightArrow', mods = 'ALT', action = wezterm.action_callback(function(window, pane)
+    pane:send_text('\x1bf')
+  end) },
 
   -- Line navigation (Ctrl + Arrow)
   { key = 'LeftArrow', mods = 'CTRL', action = act.SendKey { key = 'Home' } },
   { key = 'RightArrow', mods = 'CTRL', action = act.SendKey { key = 'End' } },
 
-  -- Delete whole line (Ctrl + Backspace)
-  { key = 'Backspace', mods = 'CTRL', action = act.SendKey { key = 'u', mods = 'CTRL' } },
+  -- Delete word backward (Ctrl + Backspace)
+  { key = 'Backspace', mods = 'CTRL', action = act.SendString '\x17' },
+
+  -- Delete word forward (Ctrl + Delete)
+  { key = 'Delete', mods = 'CTRL', action = act.SendString '\x1bd' },
+
+  -- Delete to beginning of line (Ctrl + Shift + Backspace)
+  { key = 'Backspace', mods = 'CTRL|SHIFT', action = wezterm.action_callback(function(window, pane)
+    pane:send_text('\x15')
+  end) },
+
+  -- Delete to end of line (Ctrl + Shift + Delete)
+  { key = 'Delete', mods = 'CTRL|SHIFT', action = wezterm.action_callback(function(window, pane)
+    pane:send_text('\x0b')
+  end) },
 
   -- Split panes (Ctrl+D horizontal, Ctrl+Shift+D vertical)
   { key = 'd', mods = 'CTRL', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } },
@@ -170,6 +202,10 @@ config.keys = {
   { key = 'LeftArrow', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(-1) },
   { key = 'RightArrow', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(1) },
 
+  -- Move tab left/right (Ctrl+Alt+Arrow)
+  { key = 'LeftArrow', mods = 'CTRL|ALT', action = act.MoveTabRelative(-1) },
+  { key = 'RightArrow', mods = 'CTRL|ALT', action = act.MoveTabRelative(1) },
+
   -- Clear scrollback (Ctrl+K)
   { key = 'k', mods = 'CTRL', action = act.ClearScrollback 'ScrollbackAndViewport' },
 
@@ -188,7 +224,7 @@ config.keys = {
   -- Zoom current pane (Ctrl+Z)
   { key = 'z', mods = 'CTRL', action = act.TogglePaneZoomState },
 
-  -- Resize panes (Alt+Shift+Arrow)
+  -- Resize panes (Ctrl+Shift+Arrow)
   { key = 'LeftArrow', mods = 'ALT|SHIFT', action = act.AdjustPaneSize { 'Left', 5 } },
   { key = 'RightArrow', mods = 'ALT|SHIFT', action = act.AdjustPaneSize { 'Right', 5 } },
   { key = 'UpArrow', mods = 'ALT|SHIFT', action = act.AdjustPaneSize { 'Up', 5 } },
@@ -210,6 +246,19 @@ config.keys = {
     end),
   }},
 }
+
+-- Session persistence: auto-save periodically and restore on startup
+resurrect.state_manager.periodic_save({ interval_seconds = 300, save_workspaces = true })
+
+wezterm.on('gui-startup', function(cmd)
+  resurrect.state_manager.resurrect_on_gui_startup()
+end)
+
+wezterm.on('window-close-requested', function(window, pane)
+  local workspace_state = resurrect.workspace_state.get_workspace_state()
+  resurrect.state_manager.save_state(workspace_state)
+  resurrect.state_manager.write_current_state(workspace_state.workspace, 'workspace')
+end)
 
 -- Mouse bindings - ONLY Ctrl+Click opens URLs (disable default click-to-open)
 config.mouse_bindings = {
