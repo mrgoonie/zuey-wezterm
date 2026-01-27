@@ -15,8 +15,8 @@ config.initial_rows = 45
 -- Appearance
 config.color_scheme = 'Tokyo Night'
 config.font = wezterm.font('JetBrains Mono', { weight = 'Medium' })
-config.font_size = 12
-config.line_height = 1.2
+config.font_size = 13
+config.line_height = 1.3
 config.window_padding = { left = 12, right = 12, top = 12, bottom = 12 }
 config.window_background_opacity = 0.97
 config.macos_window_background_blur = 20
@@ -194,11 +194,15 @@ config.keys = {
   -- Zoom current pane (Cmd + Z)
   { key = 'z', mods = 'CMD', action = act.TogglePaneZoomState },
 
-  -- Resize panes
-  { key = 'LeftArrow', mods = 'CMD|CTRL', action = act.AdjustPaneSize { 'Left', 5 } },
-  { key = 'RightArrow', mods = 'CMD|CTRL', action = act.AdjustPaneSize { 'Right', 5 } },
-  { key = 'UpArrow', mods = 'CMD|CTRL', action = act.AdjustPaneSize { 'Up', 5 } },
-  { key = 'DownArrow', mods = 'CMD|CTRL', action = act.AdjustPaneSize { 'Down', 5 } },
+  -- Move tab left/right (Cmd + Ctrl + Arrow)
+  { key = 'LeftArrow', mods = 'CMD|CTRL', action = act.MoveTabRelative(-1) },
+  { key = 'RightArrow', mods = 'CMD|CTRL', action = act.MoveTabRelative(1) },
+
+  -- Resize panes (Cmd + Ctrl + Shift + Arrow)
+  { key = 'LeftArrow', mods = 'CMD|CTRL|SHIFT', action = act.AdjustPaneSize { 'Left', 5 } },
+  { key = 'RightArrow', mods = 'CMD|CTRL|SHIFT', action = act.AdjustPaneSize { 'Right', 5 } },
+  { key = 'UpArrow', mods = 'CMD|CTRL|SHIFT', action = act.AdjustPaneSize { 'Up', 5 } },
+  { key = 'DownArrow', mods = 'CMD|CTRL|SHIFT', action = act.AdjustPaneSize { 'Down', 5 } },
 
   -- Command palette (Cmd + Shift + P)
   { key = 'p', mods = 'CMD|SHIFT', action = act.ActivateCommandPalette },
