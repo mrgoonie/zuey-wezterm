@@ -2,6 +2,9 @@ local wezterm = require 'wezterm'
 local act = wezterm.action
 local config = wezterm.config_builder()
 
+-- Session persistence plugin
+local resurrect = wezterm.plugin.require 'https://github.com/MLFlexer/resurrect.wezterm'
+
 -- Default working directory
 config.default_cwd = wezterm.home_dir .. '/www'
 
@@ -39,7 +42,7 @@ config.cursor_blink_rate = 500
 -- Scrollback
 config.scrollback_lines = 10000
 
--- Session persistence - auto-restore tabs/panes on restart
+-- Workspace name
 config.default_workspace = 'main'
 
 -- Long-running command notifications (alert after 10 seconds)
@@ -236,6 +239,19 @@ config.mouse_bindings = {
     action = act.CompleteSelection 'ClipboardAndPrimarySelection',
   },
 }
+
+-- Session persistence: auto-save periodically and restore on startup
+resurrect.state_manager.periodic_save({ interval_seconds = 300, save_workspaces = true })
+
+wezterm.on('gui-startup', function(cmd)
+  resurrect.state_manager.resurrect_on_gui_startup()
+end)
+
+wezterm.on('window-close-requested', function(window, pane)
+  local workspace_state = resurrect.workspace_state.get_workspace_state()
+  resurrect.state_manager.save_state(workspace_state)
+  resurrect.state_manager.write_current_state(workspace_state.workspace, 'workspace')
+end)
 
 -- Long-running command notification (bell after command finishes)
 -- Works with shell integration - add to your .zshrc:
